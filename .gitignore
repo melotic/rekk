@@ -1,0 +1,4 @@
+# Project exclude paths
+/target/
+/test/*.o
+nanomite.bin
