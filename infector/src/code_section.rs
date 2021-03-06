@@ -20,6 +20,7 @@ impl<'a, 'b> CodeSection<'a, 'b> {
         self.data
     }
     pub fn write_data(&mut self, data: &[u8]) {
+        // todo is there some memcpy to make this fast?
         for (i, b) in data.iter().enumerate() {
             self.data[i] = *b;
         }

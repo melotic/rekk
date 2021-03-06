@@ -4,6 +4,8 @@ use termcolor::Color;
 
 use crate::code_section::CodeSection;
 use crate::print_utils::print_color;
+use common::JumpData;
+use common::JumpType::JumpECXZero;
 
 const HEXBYTES_COLUMN_BYTE_LENGTH: usize = 10;
 
@@ -36,6 +38,7 @@ fn create_nanomites(section: &CodeSection, bitness: u32) -> Vec<u8> {
     formatter.options_mut().set_hex_prefix("0x");
 
     let mut output = String::new();
+    let mut jump_entry = None;
 
     while decoder.can_decode() {
         decoder.decode_out(&mut instruction);
@@ -64,13 +67,14 @@ fn create_nanomites(section: &CodeSection, bitness: u32) -> Vec<u8> {
 
         if contains_cc {
             print_color(" << FAKE NANOMITE >> ", Color::Red);
+            jump_entry = Some(JumpData::new(JumpECXZero, 100, 1000));
         }
 
         let mut patched = true;
         match instruction.flow_control() {
             FlowControl::UnconditionalBranch | FlowControl::ConditionalBranch => {
                 // Found a (un)conditional branch. Replace the code with INT 3, and replace the extra
-                // bytes with NOPs. The extra bytes are needed, as we don't want to fixup jump locations.
+                // bytes with random bytes. The random bytes are needed, as we don't want to fixup jump locations.
                 instruction.set_code(Code::Int3);
 
                 encoder.encode(&instruction, instruction.ip()).unwrap();

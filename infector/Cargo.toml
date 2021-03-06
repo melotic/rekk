@@ -11,3 +11,4 @@ iced-x86 = "1.10"
 goblin = "0.3"
 termcolor = "1.1"
 rand = "0.8"
+common = {path = "../common"}
