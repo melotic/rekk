@@ -1,11 +1,12 @@
 use iced_x86::{BlockEncoder, BlockEncoderOptions, BlockEncoderResult, Code, Decoder, DecoderOptions, Encoder, FlowControl, Formatter, Instruction, InstructionBlock, NasmFormatter};
+use num_traits::FromPrimitive;
 use rand::Rng;
 use termcolor::Color;
 
+use common::{JumpData, JumpType};
+
 use crate::code_section::CodeSection;
 use crate::print_utils::print_color;
-use common::JumpData;
-use common::JumpType::JumpECXZero;
 
 const HEXBYTES_COLUMN_BYTE_LENGTH: usize = 10;
 
@@ -22,14 +23,12 @@ fn create_nanomites(section: &CodeSection, bitness: u32) -> Vec<u8> {
     );
 
     let mut decoder = Decoder::new(bitness, section.data_ref(), DecoderOptions::NONE);
-    decoder.set_ip(section.vaddr());
     let mut instruction = Instruction::default();
     let mut instructions = Vec::new();
-
     let mut formatter = NasmFormatter::new();
     let mut encoder = Encoder::new(bitness);
-
     let mut rng = rand::thread_rng();
+    let mut jump_entries = Vec::new();
 
     // Change some options, there are many more
     formatter.options_mut().set_digit_separator("`");
@@ -40,7 +39,9 @@ fn create_nanomites(section: &CodeSection, bitness: u32) -> Vec<u8> {
     let mut output = String::new();
     let mut jump_entry = None;
 
+    decoder.set_ip(section.vaddr());
     while decoder.can_decode() {
+        jump_entry = None;
         decoder.decode_out(&mut instruction);
 
         output.clear();
@@ -67,18 +68,22 @@ fn create_nanomites(section: &CodeSection, bitness: u32) -> Vec<u8> {
 
         if contains_cc {
             print_color(" << FAKE NANOMITE >> ", Color::Red);
-            jump_entry = Some(JumpData::new(JumpECXZero, 100, 1000));
+
+            // todo this should be random.
+            jump_entry = Some(JumpData::new(JumpType::JumpParity, 100, 1000));
         }
 
         let mut patched = true;
         match instruction.flow_control() {
-            FlowControl::UnconditionalBranch | FlowControl::ConditionalBranch => {
+            FlowControl::ConditionalBranch => {
                 // Found a (un)conditional branch. Replace the code with INT 3, and replace the extra
                 // bytes with random bytes. The random bytes are needed, as we don't want to fixup jump locations.
-                instruction.set_code(Code::Int3);
+                print_color(" <=========== [[ NANOMITE ]]", Color::Green);
+                jump_entry = Some(instr_to_jump_entry(instruction, section.vaddr()));
 
-                encoder.encode(&instruction, instruction.ip()).unwrap();
-                instructions.append(&mut encoder.take_buffer());
+                //instruction.set_code(Code::Int3);
+
+                instructions.push(0xCC_u8);
 
                 // Add junk bytes.
                 for (i, _) in instr_bytes.iter().enumerate() {
@@ -89,8 +94,6 @@ fn create_nanomites(section: &CodeSection, bitness: u32) -> Vec<u8> {
                     let rnd_byte: u8 = rng.gen();
                     instructions.push(rnd_byte);
                 }
-
-                print_color(" <=========== [[ NANOMITE ]]", Color::Green);
             }
             _ => patched = false
         }
@@ -99,18 +102,55 @@ fn create_nanomites(section: &CodeSection, bitness: u32) -> Vec<u8> {
 
         if !patched {
             encoder.encode(&instruction, instruction.ip());
-            instructions.append(&mut encoder.take_buffer());
+
+            let mut buf = encoder.take_buffer();
+
+            // Some NOPs are optimized by the assembler, and have a smaller size.
+            // Pad the remaining bytes with NOPs (0x90).
+            if buf.len() < instr_bytes.len() {
+                let difference = instr_bytes.len() - buf.len();
+                for i in 0..difference {
+                    // 0x90 == nop
+                    buf.push(0x90);
+                }
+            }
+
+            // They should be equal now.
+            assert_eq!(buf.len(), instr_bytes.len());
+
+            instructions.append(&mut buf);
+        }
+
+        if jump_entry.is_some() {
+            jump_entries.push(jump_entry.unwrap());
         }
     }
 
     print_color("   [[ placing nanomites ]]\n", Color::Cyan);
 
-
     println!(
-        "section size: {}\nnanomite'd size: {}",
+        "section size: {}\nnanomite'd size: {}\njdt entries: {}",
         section.data_ref().len(),
-        instructions.len()
+        instructions.len(),
+        jump_entries.len()
     );
 
     instructions
+}
+
+fn instr_to_jump_entry(instr: Instruction, vaddr: u64) -> JumpData {
+    let cc = instr.condition_code() as u8;
+    let jump_type: Option<JumpType> = FromPrimitive::from_u8(cc);
+
+
+    let j_true = instr.near_branch_target() as i64 - instr.ip() as i64;
+    assert_ne!(j_true, 0);
+
+    println!("ip={}, vaddr={}, len={}", instr.ip(), vaddr, instr.len());
+    let j_false = instr.len();
+
+
+    print!("[jump entry]\ntype={:#?}\nj_true={}\nj_false={}", jump_type, j_true, j_false);
+
+    JumpData::new(jump_type.unwrap(), j_true as isize, j_false as usize)
 }
