@@ -28,7 +28,7 @@ impl JumpData {
 
     pub fn encrypt(&self, key: RekkEncKey, iv: &[u8; 16]) -> EncryptedJumpData {
         // serialize the object.
-        let mut cereal = bincode::serialize(self).unwrap();
+        let cereal = bincode::serialize(self).unwrap();
 
         // encrypt it.
         let aes = Aes256Cbc::new_var(key.0.as_ref(), iv).unwrap();
@@ -39,7 +39,8 @@ impl JumpData {
     }
 
     pub fn get_ip_offset(&self, eflags: u64) -> isize {
-        let mut flag_to_check = (Flags::CarryFlag, false);
+        let flag_to_check;
+
         match self.jump_type {
             JumpType::None => {
                 panic!("unknown err")
@@ -122,7 +123,7 @@ impl JumpData {
             }
         }
 
-        let mut flag = flag_to_check.0.get_flag(eflags);
+        let flag = flag_to_check.0.get_flag(eflags);
 
         if flag == flag_to_check.1 {
             self.j_true

@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
-use iced_x86::{
-    Decoder, DecoderOptions, Encoder, FlowControl, Formatter, Instruction, NasmFormatter,
-};
+use iced_x86::{Decoder, DecoderOptions, FlowControl, Formatter, Instruction, NasmFormatter};
 use num_traits::FromPrimitive;
 use rand::Rng;
 use termcolor::Color;
