@@ -1,16 +1,16 @@
+use std::{env, fs};
 use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::{env, fs};
 
+use nix::{Error, unistd};
 use nix::sys::memfd::{memfd_create, MemFdCreateFlag};
 use nix::sys::ptrace;
 use nix::sys::ptrace::cont;
 use nix::sys::signal::Signal;
 use nix::sys::signal::Signal::SIGTRAP;
 use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
-use nix::unistd::{fexecve, fork, sleep, ForkResult, Pid};
-use nix::{unistd, Error};
+use nix::unistd::{fexecve, fork, ForkResult, Pid, sleep};
 use procfs::process::{MMapPath, Process};
 
 use common::jump_data_table::JumpDataTable;
@@ -49,12 +49,13 @@ fn run_binary() {
 fn parent(child_pid: Pid) {
     let jdt = include_bytes!("../../jdt.bin");
 
+    let mut first_stop = true;
+
     loop {
         let status = waitpid(child_pid, None).unwrap();
 
-        println!("got {:#?}", status);
+        println!("Child: {:#?}", status);
 
-        let mut first_stop = true;
         match status {
             WaitStatus::Exited(_, _) => {
                 break;
@@ -62,17 +63,31 @@ fn parent(child_pid: Pid) {
             WaitStatus::Signaled(_, _, _) => {}
             WaitStatus::Stopped(pid, signal) => {
                 if first_stop && signal == Signal::SIGTRAP {
+                    println!("attached to child. continuing");
                     first_stop = false;
-                    ptrace::cont(child_pid, None);
+                    ptrace::cont(pid, None);
+                    continue;
                 }
 
                 if signal == Signal::SIGTRAP {
+                    println!("handling trap");
                     handle_int3(jdt, pid);
                 }
 
                 if signal == Signal::SIGILL {
-                    let regs = ptrace::getregs(child_pid).unwrap();
+                    let regs = ptrace::getregs(pid).unwrap();
                     println!("SIGILL 0x{:X}", regs.rip);
+                    break;
+                }
+
+                if signal == Signal::SIGSEGV {
+                    let regs = ptrace::getregs(pid).unwrap();
+                    println!("SIGSEGV 0x{:X}", regs.rip);
+                    break;
+                }
+
+                if signal == Signal::SIGCHLD {
+
                 }
             }
             WaitStatus::PtraceEvent(_, _, _) => {}
@@ -141,7 +156,7 @@ fn handle_int3(comp_enc_jdt: &[u8], pid: Pid) {
     println!("new ip 0x{:X}", regs.rip);
 
     ptrace::setregs(pid, regs);
-    ptrace::step(pid, None);
+    ptrace::cont(pid, None);
 
     println!();
 }
