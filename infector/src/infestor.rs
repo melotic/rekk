@@ -32,7 +32,6 @@ fn create_nanomites(section: &CodeSection, bitness: u32) -> (Vec<u8>, HashMap<u6
     let mut instruction = Instruction::default();
     let mut instructions = Vec::new();
     let mut formatter = NasmFormatter::new();
-    let mut encoder = Encoder::new(bitness);
     let mut rng = rand::thread_rng();
 
     // Change some options, there are many more

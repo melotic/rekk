@@ -29,7 +29,6 @@ impl JumpData {
     pub fn encrypt(&self, key: RekkEncKey, iv: &[u8; 16]) -> EncryptedJumpData {
         // serialize the object.
         let mut cereal = bincode::serialize(self).unwrap();
-        let len = cereal.len();
 
         // encrypt it.
         let aes = Aes256Cbc::new_var(key.0.as_ref(), iv).unwrap();

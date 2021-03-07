@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::collections::HashMap;
 
 use goblin::elf::program_header::PT_LOAD;
@@ -19,8 +18,7 @@ pub(crate) fn handle_elf(data: &mut Vec<u8>, elf: Elf) -> Vec<HashMap<u64, JumpD
     let base_header = elf
         .program_headers
         .iter()
-        .filter(|x| x.is_executable() && x.p_type == PT_LOAD)
-        .next()
+        .find(|x| x.is_executable() && x.p_type == PT_LOAD)
         .expect("Couldn't find ELF image base");
 
     println!("base 0x{:X}", base_header.p_vaddr);

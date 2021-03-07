@@ -1,4 +1,6 @@
+use error::Error;
 use std::collections::HashMap;
+use std::fmt::Formatter;
 use std::{error, fmt};
 
 use block_modes::BlockMode;
@@ -6,8 +8,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::jump_data::JumpData;
 use crate::{Aes256Cbc, EncryptedJumpData};
-use error::Error;
-use std::fmt::Formatter;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct JumpDataTable {
@@ -23,6 +23,7 @@ impl fmt::Display for JDTError {
         write!(f, "unknown err")
     }
 }
+
 impl Error for JDTError {}
 
 impl JumpDataTable {

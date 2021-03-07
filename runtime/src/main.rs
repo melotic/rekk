@@ -1,16 +1,16 @@
-use std::{env, fs};
 use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::{env, fs};
 
-use nix::{Error, unistd};
 use nix::sys::memfd::{memfd_create, MemFdCreateFlag};
 use nix::sys::ptrace;
 use nix::sys::ptrace::cont;
 use nix::sys::signal::Signal;
 use nix::sys::signal::Signal::SIGTRAP;
 use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
-use nix::unistd::{fexecve, fork, ForkResult, Pid, sleep};
+use nix::unistd::{fexecve, fork, sleep, ForkResult, Pid};
+use nix::{unistd, Error};
 use procfs::process::{MMapPath, Process};
 
 use common::jump_data_table::JumpDataTable;
@@ -36,7 +36,7 @@ fn run_binary() {
     let d_bin = decoder.decompress_vec(binary).unwrap();
 
     unistd::write(fd, d_bin.as_slice());
-    fs::write(Path::new("decompressed.bin"), d_bin);
+
     ptrace::traceme();
 
     let args: Vec<CString> = env::args().map(|s| CString::new(s).unwrap()).collect();
@@ -54,8 +54,6 @@ fn parent(child_pid: Pid) {
     loop {
         let status = waitpid(child_pid, None).unwrap();
 
-        println!("Child: {:#?}", status);
-
         match status {
             WaitStatus::Exited(_, _) => {
                 break;
@@ -63,14 +61,12 @@ fn parent(child_pid: Pid) {
             WaitStatus::Signaled(_, _, _) => {}
             WaitStatus::Stopped(pid, signal) => {
                 if first_stop && signal == Signal::SIGTRAP {
-                    println!("attached to child. continuing");
                     first_stop = false;
                     ptrace::cont(pid, None);
                     continue;
                 }
 
                 if signal == Signal::SIGTRAP {
-                    println!("handling trap");
                     handle_int3(jdt, pid);
                 }
 
@@ -86,9 +82,7 @@ fn parent(child_pid: Pid) {
                     break;
                 }
 
-                if signal == Signal::SIGCHLD {
-
-                }
+                if signal == Signal::SIGCHLD {}
             }
             WaitStatus::PtraceEvent(_, _, _) => {}
             WaitStatus::PtraceSyscall(_) => {}
@@ -131,32 +125,17 @@ fn handle_int3(comp_enc_jdt: &[u8], pid: Pid) {
     }
 
     let mut regs = regs.unwrap();
-
-    println!(
-        "ip: 0x{:X}\nvaddr: 0x{:X}\noffset: {}",
-        regs.rip - 1,
-        vaddr,
-        regs.rip - vaddr - 1
-    );
     let jump_data = jdt.get_jump_data(regs.rip - vaddr - 1);
 
     if jump_data.is_err() {
-        println!("no jdt entry. continuing.");
         ptrace::cont(pid, None);
         return;
     }
 
     let jump_data = jump_data.unwrap();
-
-    println!("{:#?}", jump_data);
-
     let ip_offset = jump_data.get_ip_offset(regs.eflags);
-    println!("adding {}", ip_offset);
     regs.rip = (regs.rip as i64 + ip_offset as i64 - 1) as u64;
-    println!("new ip 0x{:X}", regs.rip);
 
     ptrace::setregs(pid, regs);
     ptrace::cont(pid, None);
-
-    println!();
 }

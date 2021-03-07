@@ -14,6 +14,6 @@ pub enum Flags {
 impl Flags {
     pub fn get_flag(&self, eflags: u64) -> bool {
         let flag = *self as u64;
-        return eflags & flag != 0;
+        eflags & flag != 0
     }
 }
