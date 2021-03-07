@@ -1,17 +1,29 @@
+use std::any::Any;
 use std::collections::HashMap;
 
+use goblin::elf::program_header::PT_LOAD;
 use goblin::elf::Elf;
 use goblin::pe::section_table::IMAGE_SCN_MEM_EXECUTE;
 use goblin::pe::PE;
 
+use common::jump_data::JumpData;
+
 use crate::code_section::CodeSection;
 use crate::infestor::infest;
-use common::jump_data::JumpData;
 
 const DEFAULT_SECTION_NAME: &str = "unknown section";
 
 pub(crate) fn handle_elf(data: &mut Vec<u8>, elf: Elf) -> Vec<HashMap<u64, JumpData>> {
     let mut jdts = Vec::new();
+
+    let base_header = elf
+        .program_headers
+        .iter()
+        .filter(|x| x.is_executable() && x.p_type == PT_LOAD)
+        .next()
+        .expect("Couldn't find ELF image base");
+
+    println!("base 0x{:X}", base_header.p_vaddr);
 
     for header in elf.section_headers {
         if !header.is_executable() {
@@ -24,7 +36,7 @@ pub(crate) fn handle_elf(data: &mut Vec<u8>, elf: Elf) -> Vec<HashMap<u64, JumpD
         let mut section = CodeSection::new(
             start,
             header.sh_addr,
-            0,
+            base_header.p_vaddr,
             &mut data[start as usize..end as usize],
             elf.shdr_strtab.get(header.sh_name).unwrap().unwrap(),
         );

@@ -1,9 +1,10 @@
-use crate::{Aes256Cbc, EncryptedJumpData, JumpType, RekkEncKey};
 use block_modes::BlockMode;
 use serde::{Deserialize, Serialize};
 
+use crate::{Aes256Cbc, EncryptedJumpData, JumpType, RekkEncKey};
+
 /// Contains the necessary information to emulate the jump.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct JumpData {
     /// The type of jump.
     jump_type: JumpType,
@@ -32,8 +33,8 @@ impl JumpData {
         // encrypt it.
         let aes = Aes256Cbc::new_var(key.0.as_ref(), iv).unwrap();
 
-        aes.encrypt(cereal.as_mut(), len);
+        let enc = aes.encrypt_vec(cereal.as_slice());
 
-        EncryptedJumpData { key, data: cereal }
+        EncryptedJumpData { key, data: enc }
     }
 }

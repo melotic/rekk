@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::jump_data::JumpData;
 use crate::{Aes256Cbc, EncryptedJumpData};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct JumpDataTable {
     pub table: HashMap<u64, EncryptedJumpData>,
     pub iv: [u8; 16],
@@ -21,7 +21,7 @@ impl JumpDataTable {
         }
     }
 
-    fn get_jump_data(&self, addr: u64) -> Result<JumpData, Box<dyn error::Error>> {
+    pub fn get_jump_data(&self, addr: u64) -> Result<JumpData, Box<dyn error::Error>> {
         // Look up the EncryptedJumpData from the hashmap.
         // Then, decrypt the data, deserialize it, and give it to the user.
         let enc_data = self.table.get(&addr).expect("no entry exists in jdt");

@@ -7,10 +7,11 @@ use num_traits::FromPrimitive;
 use rand::Rng;
 use termcolor::Color;
 
-use crate::code_section::CodeSection;
-use crate::print_utils::print_color;
 use common::jump_data::JumpData;
 use common::JumpType;
+
+use crate::code_section::CodeSection;
+use crate::print_utils::print_color;
 
 const HEXBYTES_COLUMN_BYTE_LENGTH: usize = 10;
 
@@ -46,30 +47,41 @@ fn create_nanomites(section: &CodeSection, bitness: u32) -> (Vec<u8>, HashMap<u6
 
     decoder.set_ip(section.vaddr());
     while decoder.can_decode() {
-        jump_entry = None;
+        // decode the instruction.
         decoder.decode_out(&mut instruction);
 
-        output.clear();
-        formatter.format(&instruction, &mut output);
-
         print!("{:016X} ", instruction.ip());
+
+        // get the bytes that make up the instruction
         let start_index = (instruction.ip() - section.vaddr()) as usize;
         let instr_bytes = &section.data_ref()[start_index..start_index + instruction.len()];
 
+        // does the instruction contain an 0xCC (int 3)?
         let mut contains_cc = false;
 
+        // print each hex byte in the instruction.
         for b in instr_bytes.iter() {
             print!("{:02X} ", b);
+
             if b.eq(&0xCC_u8) {
                 contains_cc = true;
             }
         }
+
+        // Print padding
         if instr_bytes.len() < HEXBYTES_COLUMN_BYTE_LENGTH {
             for _ in 0..HEXBYTES_COLUMN_BYTE_LENGTH - instr_bytes.len() {
                 print!("   ");
             }
         }
+
+        // format the instruction & print to the console.
+        output.clear();
+        formatter.format(&instruction, &mut output);
         print!(" {}", output);
+
+        // reset the jump entry that might be added to the jdt
+        jump_entry = None;
 
         if contains_cc {
             print_color(" << FAKE NANOMITE >> ", Color::Red);
@@ -78,7 +90,9 @@ fn create_nanomites(section: &CodeSection, bitness: u32) -> (Vec<u8>, HashMap<u6
             jump_entry = Some(JumpData::new(JumpType::JumpParity, 100, 1000));
         }
 
+        // was this instruction patched to an 0xCC?
         let mut patched = true;
+
         match instruction.flow_control() {
             FlowControl::ConditionalBranch => {
                 // Found a (un)conditional branch. Replace the code with INT 3, and replace the extra
@@ -86,8 +100,7 @@ fn create_nanomites(section: &CodeSection, bitness: u32) -> (Vec<u8>, HashMap<u6
                 print_color(" <=========== [[ NANOMITE ]]", Color::Green);
                 jump_entry = Some(instr_to_jump_entry(instruction));
 
-                //instruction.set_code(Code::Int3);
-
+                // Push the int 3 opcode.
                 instructions.push(0xCC_u8);
 
                 // Add junk bytes.
@@ -105,25 +118,15 @@ fn create_nanomites(section: &CodeSection, bitness: u32) -> (Vec<u8>, HashMap<u6
 
         println!();
 
+        // The instruction was not patched, and needs to be added to the code buffer.
         if !patched {
-            encoder.encode(&instruction, instruction.ip()).unwrap();
-
-            let mut buf = encoder.take_buffer();
-
-            // Some NOPs are optimized by the assembler, and have a smaller size.
-            // Pad the remaining bytes with NOPs (0x90).
-            if buf.len() < instr_bytes.len() {
-                buf.resize(instr_bytes.len(), 0xCC_u8);
-            }
-
-            // They should be equal now.
-            assert_eq!(buf.len(), instr_bytes.len());
-
-            instructions.append(&mut buf);
+            instructions.extend_from_slice(instr_bytes);
         }
 
+        // If there was a jcc, then add the jump entry to the jdt
         if let Some(entry) = jump_entry {
-            jump_entries.insert(instruction.ip() - section.vaddr(), entry);
+            println!("key {}", instruction.ip() - section.base());
+            jump_entries.insert(instruction.ip() - section.base(), entry);
         }
     }
 

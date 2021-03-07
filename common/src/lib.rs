@@ -15,11 +15,11 @@ pub mod jump_data;
 pub mod jump_data_table;
 
 /// A 32 byte encryption key.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct RekkEncKey(pub [u8; 32]);
 
 /// An encrypted jump data struct.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct EncryptedJumpData {
     key: RekkEncKey,
     data: Vec<u8>,
