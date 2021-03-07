@@ -1,9 +1,11 @@
 use std::ffi::{CStr, CString};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::{env, fs};
 
 use nix::sys::memfd::{memfd_create, MemFdCreateFlag};
 use nix::sys::ptrace;
+use nix::sys::ptrace::cont;
 use nix::sys::signal::Signal;
 use nix::sys::signal::Signal::SIGTRAP;
 use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
@@ -14,7 +16,6 @@ use procfs::process::{MMapPath, Process};
 use common::jump_data_table::JumpDataTable;
 
 fn main() {
-    println!("hello");
     // fork!
     match unsafe { fork() } {
         Ok(ForkResult::Parent { child }) => parent(child),
@@ -28,7 +29,7 @@ fn run_binary() {
 
     // create the memory file descriptor
     let fd_name = CString::new("child").unwrap();
-    let fd = memfd_create(&fd_name, MemFdCreateFlag::empty()).unwrap();
+    let fd = memfd_create(&fd_name, MemFdCreateFlag::MFD_CLOEXEC).unwrap();
 
     // decompress the binary.
     let mut decoder = snap::raw::Decoder::new();
@@ -46,7 +47,6 @@ fn run_binary() {
 }
 
 fn parent(child_pid: Pid) {
-    println!("the child is {}", child_pid);
     let jdt = include_bytes!("../../jdt.bin");
 
     loop {
@@ -83,6 +83,8 @@ fn parent(child_pid: Pid) {
     }
 }
 
+static VADDR: AtomicU64 = AtomicU64::new(0);
+
 fn handle_int3(comp_enc_jdt: &[u8], pid: Pid) {
     // decompress JDT.
     let mut decoder = snap::raw::Decoder::new();
@@ -90,24 +92,56 @@ fn handle_int3(comp_enc_jdt: &[u8], pid: Pid) {
 
     let proc = Process::new(pid.as_raw()).unwrap();
     let proc_maps = proc.maps().unwrap();
-    let map = proc_maps
-        .iter()
-        .filter(|x| x.perms.contains("x"))
-        .next()
-        .unwrap();
-    let vaddr = map.address.0;
 
-    // get the ip
-    let regs = ptrace::getregs(pid).unwrap();
+    let mut vaddr = VADDR.load(Ordering::Relaxed);
+
+    if vaddr == 0 {
+        let map = proc_maps
+            .iter()
+            .filter(|x| x.perms.contains("x"))
+            .next()
+            .unwrap();
+
+        VADDR.store(map.address.0, Ordering::Relaxed);
+        vaddr = map.address.0;
+    }
 
     let jdt: JumpDataTable = bincode::deserialize(raw_jdt.as_slice()).unwrap();
 
-    //println!("{:#?}", jdt);
+    // get the ip
+    let regs = ptrace::getregs(pid);
+
+    if regs.is_err() {
+        return;
+    }
+
+    let mut regs = regs.unwrap();
+
     println!(
-        "ip: {:X}\nvaddr: {:X}\noffset: {:X}",
-        regs.rip,
+        "ip: 0x{:X}\nvaddr: 0x{:X}\noffset: {}",
+        regs.rip - 1,
         vaddr,
         regs.rip - vaddr - 1
     );
-    println!("{:#?}", jdt.get_jump_data(regs.rip - vaddr - 1).unwrap());
+    let jump_data = jdt.get_jump_data(regs.rip - vaddr - 1);
+
+    if jump_data.is_err() {
+        println!("no jdt entry. continuing.");
+        ptrace::cont(pid, None);
+        return;
+    }
+
+    let jump_data = jump_data.unwrap();
+
+    println!("{:#?}", jump_data);
+
+    let ip_offset = jump_data.get_ip_offset(regs.eflags);
+    println!("adding {}", ip_offset);
+    regs.rip = (regs.rip as i64 + ip_offset as i64 - 1) as u64;
+    println!("new ip 0x{:X}", regs.rip);
+
+    ptrace::setregs(pid, regs);
+    ptrace::step(pid, None);
+
+    println!();
 }

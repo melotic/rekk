@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 pub type Aes256Cbc = Cbc<Aes256, Pkcs7>;
 
+pub mod flags;
 pub mod jump_data;
 pub mod jump_data_table;
 
@@ -30,36 +31,52 @@ pub struct EncryptedJumpData {
 pub enum JumpType {
     /// The instruction doesn't have a condition code
     None = 0,
+
     /// Overflow (`OF=1`)
     JumpOverflow = 1,
+
     /// Not overflow (`OF=0`)
     JumpNotOverflow = 2,
+
     /// Below (unsigned) (`CF=1`)
     JumpBelow = 3,
+
     /// Above or equal (unsigned) (`CF=0`)
     JumpAboveEqual = 4,
+
     /// Equal / zero (`ZF=1`)
     JumpEqual = 5,
+
     /// Not equal / zero (`ZF=0`)
     JumpNotEqual = 6,
+
     /// Below or equal (unsigned) (`CF=1 or ZF=1`)
     JumpBelowEqual = 7,
+
     /// Above (unsigned) (`CF=0 and ZF=0`)
     JumpAbove = 8,
+
     /// Signed (`SF=1`)
     JumpSigned = 9,
+
     /// Not signed (`SF=0`)
     JumpNotSigned = 10,
+
     /// Parity (`PF=1`)
     JumpParity = 11,
+
     /// Not parity (`PF=0`)
     JumpNotParity = 12,
+
     /// Less (signed) (`SF!=OF`)
     JumpLess = 13,
+
     /// Greater than or equal (signed) (`SF=OF`)
     JumpGreaterEqual = 14,
+
     /// Less than or equal (signed) (`ZF=1 or SF!=OF`)
     JumpLessEqual = 15,
+
     /// Greater (signed) (`ZF=0 and SF=OF`)
     JumpGreater = 16,
 }
