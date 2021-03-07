@@ -7,11 +7,13 @@ use std::path::Path;
 use goblin::Object;
 
 use crate::binary_parser::*;
+use crate::jump_data_exporter::export_jdt;
 
 mod binary_parser;
 mod code_section;
 mod infestor;
 mod print_utils;
+mod jump_data_exporter;
 
 #[derive(Debug, Clone)]
 struct InvalidFileError;
@@ -33,15 +35,17 @@ fn run() -> Result<(), Box<dyn Error>> {
             let object = { Object::parse(&data) };
 
             let mut data = data.to_vec();
+            let jdts;
 
             if let Ok(Object::PE(pe)) = object {
-                handle_pe(&mut data, pe);
+                jdts = Some(handle_pe(&mut data, pe));
             } else if let Ok(Object::Elf(elf)) = object {
-                handle_elf(&mut data, elf);
+                jdts = Some(handle_elf(&mut data, elf));
             } else {
                 return Err(InvalidFileError.into());
             }
 
+            fs::write(Path::new("jdt.bin"), export_jdt(jdts.unwrap()));
             fs::write(Path::new("nanomite.bin"), data)?;
         }
     }

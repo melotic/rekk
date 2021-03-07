@@ -1,13 +1,19 @@
+use std::collections::HashMap;
+
 use goblin::elf::Elf;
-use goblin::pe::section_table::IMAGE_SCN_MEM_EXECUTE;
 use goblin::pe::PE;
+use goblin::pe::section_table::IMAGE_SCN_MEM_EXECUTE;
+
+use common::JumpData;
 
 use crate::code_section::CodeSection;
 use crate::infestor::infest;
 
 const DEFAULT_SECTION_NAME: &str = "unknown section";
 
-pub(crate) fn handle_elf(data: &mut Vec<u8>, elf: Elf) {
+pub(crate) fn handle_elf(data: &mut Vec<u8>, elf: Elf) -> Vec<HashMap<u64, JumpData>> {
+    let mut jdts = Vec::new();
+
     for header in elf.section_headers {
         if !header.is_executable() {
             continue;
@@ -23,11 +29,15 @@ pub(crate) fn handle_elf(data: &mut Vec<u8>, elf: Elf) {
             &mut data[start as usize..end as usize],
             elf.shdr_strtab.get(header.sh_name).unwrap().unwrap(),
         );
-        infest(&mut section, if elf.is_64 { 64 } else { 32 });
+        jdts.push(infest(&mut section, if elf.is_64 { 64 } else { 32 }));
     }
+
+    jdts
 }
 
-pub(crate) fn handle_pe(data: &mut Vec<u8>, pe: PE) {
+pub(crate) fn handle_pe(data: &mut Vec<u8>, pe: PE) -> Vec<HashMap<u64, JumpData>> {
+    let mut jdts = Vec::new();
+
     for sec in pe.sections {
         if sec.characteristics & IMAGE_SCN_MEM_EXECUTE == 0 {
             continue;
@@ -46,6 +56,8 @@ pub(crate) fn handle_pe(data: &mut Vec<u8>, pe: PE) {
             sec_name.as_str(),
         );
 
-        infest(&mut section, if pe.is_64 { 64 } else { 32 });
+        jdts.push(infest(&mut section, if pe.is_64 { 64 } else { 32 }));
     }
+
+    jdts
 }
