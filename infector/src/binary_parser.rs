@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
 use goblin::elf::Elf;
-use goblin::pe::PE;
 use goblin::pe::section_table::IMAGE_SCN_MEM_EXECUTE;
-
-use common::JumpData;
+use goblin::pe::PE;
 
 use crate::code_section::CodeSection;
 use crate::infestor::infest;
+use common::jump_data::JumpData;
 
 const DEFAULT_SECTION_NAME: &str = "unknown section";
 

@@ -1,17 +1,16 @@
 use std::collections::HashMap;
 
 use iced_x86::{
-    BlockEncoder, BlockEncoderOptions, BlockEncoderResult, Code, Decoder, DecoderOptions, Encoder,
-    FlowControl, Formatter, Instruction, InstructionBlock, NasmFormatter,
+    Decoder, DecoderOptions, Encoder, FlowControl, Formatter, Instruction, NasmFormatter,
 };
 use num_traits::FromPrimitive;
 use rand::Rng;
 use termcolor::Color;
 
-use common::{JumpData, JumpType};
-
 use crate::code_section::CodeSection;
 use crate::print_utils::print_color;
+use common::jump_data::JumpData;
+use common::JumpType;
 
 const HEXBYTES_COLUMN_BYTE_LENGTH: usize = 10;
 
@@ -131,7 +130,7 @@ fn create_nanomites(section: &CodeSection, bitness: u32) -> (Vec<u8>, HashMap<u6
     print_color("   [[ placing nanomites ]]\n", Color::Cyan);
 
     println!(
-        "section size: {}\nnanomite'd size: {}\n jdt size: {}",
+        "section size: {}\nnanomite'd size: {}\njdt size: {}",
         section.data_ref().len(),
         instructions.len(),
         jump_entries.len()

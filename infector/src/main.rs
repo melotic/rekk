@@ -12,8 +12,8 @@ use crate::jump_data_exporter::export_jdt;
 mod binary_parser;
 mod code_section;
 mod infestor;
-mod print_utils;
 mod jump_data_exporter;
+mod print_utils;
 
 #[derive(Debug, Clone)]
 struct InvalidFileError;
@@ -45,8 +45,12 @@ fn run() -> Result<(), Box<dyn Error>> {
                 return Err(InvalidFileError.into());
             }
 
-            fs::write(Path::new("jdt.bin"), export_jdt(jdts.unwrap()));
-            fs::write(Path::new("nanomite.bin"), data)?;
+            // compress the binary.
+            let mut encoder = snap::raw::Encoder::new();
+            let compressed_binary = encoder.compress_vec(&data)?;
+
+            fs::write(Path::new("jdt.bin"), export_jdt(jdts.unwrap()))?;
+            fs::write(Path::new("nanomite.bin"), compressed_binary)?;
         }
     }
     Ok(())
