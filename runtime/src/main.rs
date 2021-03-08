@@ -101,13 +101,13 @@ fn handle_int3(comp_enc_jdt: &[u8], pid: Pid) -> Result<(), Box<dyn error::Error
     // decompress JDT.
     let mut decoder = snap::raw::Decoder::new();
     let raw_jdt = decoder.decompress_vec(comp_enc_jdt)?;
-
-    let proc = Process::new(pid.as_raw())?;
-    let proc_maps = proc.maps()?;
-
+    
     let mut vaddr = VADDR.load(Ordering::Relaxed);
 
     if vaddr == 0 {
+        let proc = Process::new(pid.as_raw())?;
+        let proc_maps = proc.maps()?;
+
         let map = proc_maps.iter().find(|x| x.perms.contains('x')).unwrap();
 
         VADDR.store(map.address.0, Ordering::Relaxed);
