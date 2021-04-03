@@ -390,7 +390,6 @@ dependencies = [
  "bincode",
  "block-modes",
  "common",
- "goblin",
  "nix",
  "ntapi",
  "procfs",
