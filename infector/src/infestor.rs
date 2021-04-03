@@ -122,7 +122,7 @@ fn create_nanomites(section: &CodeSection, bitness: u32) -> (Vec<u8>, HashMap<u6
 
         // If there was a jcc, then add the jump entry to the jdt
         if let Some(entry) = jump_entry {
-            println!("key {}", instruction.ip() - section.base());
+            println!("key {:X}", instruction.ip() - section.base());
             jump_entries.insert(instruction.ip() - section.base(), entry);
         }
     }

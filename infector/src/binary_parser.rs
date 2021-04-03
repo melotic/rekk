@@ -59,7 +59,7 @@ pub(crate) fn handle_pe(data: &mut Vec<u8>, pe: PE) -> Vec<HashMap<u64, JumpData
 
         let mut section = CodeSection::new(
             start as u64,
-            sec.virtual_address as u64,
+            sec.virtual_address as u64 + pe.image_base as u64,
             pe.image_base as u64,
             &mut data[start..end],
             sec_name.as_str(),

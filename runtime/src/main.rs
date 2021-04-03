@@ -8,7 +8,7 @@ use crate::linux_runtime::run;
 mod windows_runtime;
 
 #[cfg(target_os = "windows")]
-use create::windows_runtime::run;
+use crate::windows_runtime::run;
 
 fn main() {
     run();
