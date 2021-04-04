@@ -56,10 +56,6 @@ unsafe fn run_handler(proc_info: PROCESS_INFORMATION, proc_name: String) {
     loop {
         WaitForDebugEvent(&mut debug_event, INFINITE);
 
-        if debug_event.dwDebugEventCode != 1 {
-            println!("DebugEvent: {}", debug_event.dwDebugEventCode);
-        }
-
         match debug_event.dwDebugEventCode {
             // Received an exception.
             1 => handle_int3(debug_event.dwThreadId, base_addr, &jdt),
@@ -69,7 +65,7 @@ unsafe fn run_handler(proc_info: PROCESS_INFORMATION, proc_name: String) {
             }
             // Something no bueno happened.
             0 => {
-                panic!("error waiting for debug event.");
+                panic!();
             }
             _ => {}
         }
@@ -132,7 +128,7 @@ unsafe fn handle_int3(thread_id: DWORD, base_addr: u64, jdt: &JumpDataTable) {
     let handle = OpenThread(THREAD_ALL_ACCESS, TRUE, thread_id);
 
     if !SUCCEEDED(handle as i32) {
-        panic!("couldn't access thread.");
+        panic!();
     }
 
     // GetThreadContext requires the thread is suspended. It should already be suspended, this is for redundancy.
